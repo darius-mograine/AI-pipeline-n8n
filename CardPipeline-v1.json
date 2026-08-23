@@ -1,0 +1,801 @@
+{
+  "name": "CardPipeline-v1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ccf0b9a2-432b-412b-852e-a3c9a6d25694",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/botвставьте_ключ/getUpdates",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "4a7b6cff-ee32-4635-8230-ede2b8480913",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst lockPath = 'D:\\\\n8n-card-pipeline\\\\pipeline.lock';\n\nif (fs.existsSync(lockPath)) {\n  const stats = fs.statSync(lockPath);\n  const ageMs = Date.now() - stats.mtimeMs;\n  const maxAgeMs = 10 * 60 * 1000; // 10 минут\n\n  if (ageMs < maxAgeMs) {\n    return [];\n  }\n  // замок старше 10 минут — считаем зависшим, снимаем сами\n  fs.unlinkSync(lockPath);\n}\n\nconst staticData = $getWorkflowStaticData('global');\nconst lastId = staticData.lastUpdateId || 0;\n\nconst updates = $input.first().json.result || [];\nconst newMessages = updates.filter(u => u.update_id > lastId);\n\nif (newMessages.length > 0) {\n  fs.writeFileSync(lockPath, 'locked');\n  staticData.lastUpdateId = newMessages[newMessages.length - 1].update_id;\n}\n\nreturn newMessages.map(u => ({ json: u }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "ae5cea33-eab9-48d7-b664-48db93e2bc10",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "98ac231e-c4e3-47ef-905a-07b7496b0014",
+              "leftValue": "={{ $json.update_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "0ee316dc-dfee-4359-8187-9f8c57fd0633",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.message.text;\nconst chatId = $json.message.chat.id;\n\nconst themeMatch = text.match(/Тема:\\s*(.+)/i);\nconst wishesMatch = text.match(/Пожелания:\\s*(.+)/i);\n\nconst staticData = $getWorkflowStaticData('global');\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst folderPath = `D:\\\\n8n-card-pipeline\\\\Card\\\\${timestamp}`;\n\nstaticData.chatId = chatId;\nstaticData.folderPath = folderPath;\nstaticData.previewPaths = [];\n\nreturn [{\n  json: {\n    chatId: chatId,\n    theme: themeMatch ? themeMatch[1].trim() : '',\n    wishes: wishesMatch ? wishesMatch[1].trim() : '',\n    folderPath: folderPath\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        -160
+      ],
+      "id": "5cdc6a14-d78a-4c10-90c0-0392d462c256",
+      "name": "Разделение темы и пожелания"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=Начинаю генерацию набора \"{{ $json.theme }}\", это займёт несколько минут",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1152,
+        -160
+      ],
+      "id": "f056cde3-04c3-4129-b295-968eb61dfcbd",
+      "name": "Обратная связь на сообщение",
+      "webhookId": "51b7f278-7a1e-4208-8f4b-5b92b572d876",
+      "credentials": {
+        "telegramApi": {
+          "id": "Pxfn2O4IiJRxOEdf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=вставьте_ключ",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Тема набора: {{ $json.theme }}. Пожелания продюсера: {{ $json.wishes }}. Составь набор из 10 карточек по правилам: Категория 1 (3 карточки) — объект без мелких деталей, висит в воздухе, фон одноцветный/градиент или простой узор. Категория 2 (3 карточки) — объект без мелких деталей, стоит на поверхности, позади вертикальная плоскость, простой фон. Категория 3 (2 карточки) — объект на реалистичной поверхности, объёмный фон. Категория 4 (2 карточки) — объект вписан в реалистичное окружение, остаётся центральным. Стиль всех карточек: казуальная мобильная 3D-иконка, яркие насыщенные цвета, мягкий свет, без текста, без рамки, без персонажей. Ответь СТРОГО в формате JSON-массива из 10 объектов с полями: name, category (число 1-4), prompt (детальный промпт для генерации картинки на английском языке). Никакого текста кроме JSON в ответе.\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1392,
+        -160
+      ],
+      "id": "2daf45ee-6039-4457-8cf8-9438a8e3ac6f",
+      "name": "Создание промта у Gemini"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $json.candidates[0].content.parts[0].text;\nconst cleaned = rawText.replace(/```json|```/g, '').trim();\nconst cards = JSON.parse(cleaned);\n\nconst chatId = $('Разделение темы и пожелания').first().json.chatId;\nconst theme = $('Разделение темы и пожелания').first().json.theme;\n\nreturn cards.map(card => ({\n  json: { ...card, chatId, theme }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        -160
+      ],
+      "id": "fd94b8d1-7977-4b0d-8437-758ee9717ee0",
+      "name": "Разбор ответа от Gemini"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1872,
+        -160
+      ],
+      "id": "a64f4e1a-e767-47cf-a7e6-a909534759db",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        -48
+      ],
+      "id": "b6cb56e2-13d2-4cef-a6e2-b6d4e49b6e3d",
+      "name": "Wait",
+      "webhookId": "ee567643-77d4-421a-990b-3db6ee17e5aa"
+    },
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($json.prompt) }}?width=1024&height=1024&seed=1&nologo=true",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2288,
+        -48
+      ],
+      "id": "1164ecf8-b657-4d9f-ab6e-fdee94881700",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.safeFolderPath }}\\variant_1.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2656,
+        -48
+      ],
+      "id": "ae0644ab-189e-4799-b27c-b832133991b9",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        144
+      ],
+      "id": "a3327179-f4fe-4e95-ba9b-594c7dd6feb2",
+      "name": "Wait1",
+      "webhookId": "ee567643-77d4-421a-990b-3db6ee17e5aa"
+    },
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($json.prompt) }}?width=1024&height=1024&seed=2&nologo=true",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2288,
+        144
+      ],
+      "id": "6e9250fc-cffa-4c89-a413-d3c2a962a884",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.folderPath }}\\cat{{ $json.category }}_{{ $json.name }}\\variant_2.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2656,
+        144
+      ],
+      "id": "52226db8-af46-40eb-bf61-673be738f10b",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        336
+      ],
+      "id": "5f28ada2-83f1-442b-88e8-f26e212fd041",
+      "name": "Wait2",
+      "webhookId": "ee567643-77d4-421a-990b-3db6ee17e5aa"
+    },
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($json.prompt) }}?width=1024&height=1024&seed=3&nologo=true",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2288,
+        336
+      ],
+      "id": "69fa164a-203f-4162-a552-475f46919825",
+      "name": "HTTP Request3"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.folderPath }}\\cat{{ $json.category }}_{{ $json.name }}\\variant_3.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2656,
+        336
+      ],
+      "id": "ff9c5da6-9f4f-4336-b2ba-f39177ba7b80",
+      "name": "Read/Write Files from Disk2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.previewPaths.push($json.filePath || $json.fileName);\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        -48
+      ],
+      "id": "648dbb77-4c52-4076-b3a7-9f472baeda10",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nreturn staticData.previewPaths.map(p => ({\n  json: { path: p, chatId: staticData.chatId, folderPath: staticData.folderPath }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2112,
+        -368
+      ],
+      "id": "98977709-a484-4ca1-b5d7-29ea72b6276e",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.path }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2288,
+        -368
+      ],
+      "id": "d1570a49-04d2-4a97-85a9-9cf6ecf15b7d",
+      "name": "Read/Write Files from Disk3"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $json.chatId }}",
+        "binaryData": true,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2688,
+        -368
+      ],
+      "id": "76d335e0-3dab-4103-a571-547b3ff15e40",
+      "name": "Send a photo message",
+      "webhookId": "37574238-a2ac-4068-b664-1a4b1014541c",
+      "credentials": {
+        "telegramApi": {
+          "id": "Pxfn2O4IiJRxOEdf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=Готово! Все карточки сохранены здесь: {{ $json.folderPath }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2288,
+        -544
+      ],
+      "id": "8ceddc73-ecdf-42af-b21e-392f774a7a74",
+      "name": "Send a text message",
+      "webhookId": "a681d03a-d1c4-499f-82ee-bd73acd9a514",
+      "credentials": {
+        "telegramApi": {
+          "id": "Pxfn2O4IiJRxOEdf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst staticData = $getWorkflowStaticData('global');\nconst safeName = $json.name.replace(/[<>:\"/\\\\|?*]/g, '').trim();\nconst targetFolder = `${staticData.folderPath}\\\\cat${$json.category}_${safeName}`;\n\nfs.mkdirSync(targetFolder, { recursive: true });\n\nreturn [{\n  json: { ...$json, safeFolderPath: targetFolder },\n  binary: $binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        -48
+      ],
+      "id": "4da572a1-7fb5-413a-95b4-9f29c039ffcf",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst safeName = $json.name.replace(/[<>:\"/\\\\|?*]/g, '').trim();\nconst folderPath = `${$json.folderPath}\\\\cat${$json.category}_${safeName}`;\nfs.mkdirSync(folderPath, { recursive: true });\n\nreturn [{ json: { ...$json, safeFolderPath: folderPath } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        144
+      ],
+      "id": "ae459e8c-c1db-4c49-a950-dd342d25d906",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst safeName = $json.name.replace(/[<>:\"/\\\\|?*]/g, '').trim();\nconst folderPath = `${$json.folderPath}\\\\cat${$json.category}_${safeName}`;\nfs.mkdirSync(folderPath, { recursive: true });\n\nreturn [{ json: { ...$json, safeFolderPath: folderPath } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        336
+      ],
+      "id": "9a0960cc-77ee-4a31-a14f-01b37d093670",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst lockPath = 'D:\\\\n8n-card-pipeline\\\\pipeline.lock';\n\nif (fs.existsSync(lockPath)) {\n  fs.unlinkSync(lockPath);\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        -544
+      ],
+      "id": "0db251dd-fa82-461d-9f07-c9dba135ad0b",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nreturn [{\n  json: {\n    chatId: staticData.chatId,\n    folderPath: staticData.folderPath\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2112,
+        -544
+      ],
+      "id": "9ced5d78-24d4-4b82-87d0-40d896c905fd",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nreturn [{\n  json: { chatId: staticData.chatId },\n  binary: $binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        -368
+      ],
+      "id": "a4fbbe6b-b121-46bd-bc28-2d4538cfc661",
+      "name": "Возвращает ChatID для отображения превью"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Разделение темы и пожелания",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разделение темы и пожелания": {
+      "main": [
+        [
+          {
+            "node": "Обратная связь на сообщение",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Обратная связь на сообщение": {
+      "main": [
+        [
+          {
+            "node": "Создание промта у Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создание промта у Gemini": {
+      "main": [
+        [
+          {
+            "node": "Разбор ответа от Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разбор ответа от Gemini": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk3": {
+      "main": [
+        [
+          {
+            "node": "Возвращает ChatID для отображения превью",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Возвращает ChatID для отображения превью": {
+      "main": [
+        [
+          {
+            "node": "Send a photo message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "299b6b54-8067-48b0-b62c-909d72589c6e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d5a08cdf89f27bbf07841ca2d10c0f02da807116c3e44542221bcf8a216609c"
+  },
+  "nodeGroups": [],
+  "id": "pc2aI6fQhwoOh8Ae",
+  "tags": []
+}
