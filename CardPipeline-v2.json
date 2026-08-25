@@ -1,0 +1,973 @@
+{
+  "name": "CardPipeline-v2",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/botвставьте_ключ/getUpdates",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "f70e2fb7-4440-4104-9d44-0974150c38a8",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst lockPath = 'D:\\\\n8n-card-pipeline\\\\pipeline.lock';\n\nif (fs.existsSync(lockPath)) {\n  const stats = fs.statSync(lockPath);\n  const ageMs = Date.now() - stats.mtimeMs;\n  const maxAgeMs = 10 * 60 * 1000; // 10 минут\n\n  if (ageMs < maxAgeMs) {\n    return [];\n  }\n  // замок старше 10 минут — считаем зависшим, снимаем сами\n  fs.unlinkSync(lockPath);\n}\n\nconst staticData = $getWorkflowStaticData('global');\nconst lastId = staticData.lastUpdateId || 0;\n\nconst updates = $input.first().json.result || [];\nconst newMessages = updates.filter(u => u.update_id > lastId);\n\nif (newMessages.length > 0) {\n  fs.writeFileSync(lockPath, 'locked');\n  staticData.lastUpdateId = newMessages[newMessages.length - 1].update_id;\n}\n\nreturn newMessages.map(u => ({ json: u }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "ad6e972f-6f6f-44a2-8946-39cbb2fe852e",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "98ac231e-c4e3-47ef-905a-07b7496b0014",
+              "leftValue": "={{ $json.update_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "9c689e5a-bf47-435c-9bfd-923f50648218",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.message.text;\nconst chatId = $json.message.chat.id;\n\nconst themeMatch = text.match(/Тема:\\s*(.+)/i);\nconst wishesMatch = text.match(/Пожелания:\\s*(.+)/i);\n\nconst staticData = $getWorkflowStaticData('global');\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst folderPath = `D:\\\\n8n-card-pipeline\\\\Card\\\\${timestamp}`;\n\nconst theme = themeMatch ? themeMatch[1].trim() : '';\nconst wishes = wishesMatch ? wishesMatch[1].trim() : '';\n\nstaticData.chatId = chatId;\nstaticData.folderPath = folderPath;\nstaticData.previewPaths = [];\nstaticData.startTime = Date.now();\nstaticData.theme = theme;\nstaticData.wishes = wishes;\n\nreturn [{\n  json: {\n    chatId: chatId,\n    theme: theme,\n    wishes: wishes,\n    folderPath: folderPath\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        -160
+      ],
+      "id": "163c6d61-5778-4bca-86d5-ec9afeabbf78",
+      "name": "Разделение темы и пожелания"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2144,
+        -160
+      ],
+      "id": "f88520d9-7bd3-4a3b-b3a9-ee8fcb24675f",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2384,
+        -48
+      ],
+      "id": "e54e3d3d-eae0-4ddb-a6c2-54764532c07c",
+      "name": "Wait",
+      "webhookId": "6073ee90-dbe6-41d2-a508-bd458d962ebf"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.safeFolderPath }}\\variant_1.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2960,
+        -48
+      ],
+      "id": "e304adde-9c4b-4df2-8060-61461c4d287e",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2384,
+        144
+      ],
+      "id": "8468b69b-016f-41e8-9acc-f63aa888181f",
+      "name": "Wait1",
+      "webhookId": "da7bcbd8-cb72-4e72-9c53-eb3c3656ed19"
+    },
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($json.prompt) }}?width=1024&height=1024&seed=2&nologo=true",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2592,
+        144
+      ],
+      "id": "a7c2a1fe-7a34-4594-89a3-45cc70e8c179",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.folderPath }}\\cat{{ $json.category }}_{{ $json.name }}\\variant_2.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2960,
+        144
+      ],
+      "id": "b5c16a2f-94bb-4fbc-9618-023d8a186c7e",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2384,
+        336
+      ],
+      "id": "41e863db-c09a-4bc5-8a6f-a42856517228",
+      "name": "Wait2",
+      "webhookId": "dd60a88f-a2cc-4612-a7bc-3aa70d8c73f9"
+    },
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($json.prompt) }}?width=1024&height=1024&seed=3&nologo=true",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2592,
+        336
+      ],
+      "id": "d4dd9445-578b-466d-9ab9-f495256d8ff9",
+      "name": "HTTP Request3"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.folderPath }}\\cat{{ $json.category }}_{{ $json.name }}\\variant_3.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2960,
+        336
+      ],
+      "id": "e54d4c7a-276d-43d1-b42e-6caaff1553c9",
+      "name": "Read/Write Files from Disk2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.previewPaths.push($json.filePath || $json.fileName);\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3184,
+        -48
+      ],
+      "id": "aa360638-3443-4199-b23c-d8486aab4313",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nreturn staticData.previewPaths.map(p => ({\n  json: { path: p, chatId: staticData.chatId, folderPath: staticData.folderPath }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2384,
+        -368
+      ],
+      "id": "1d26dd83-1780-4fff-b285-5d5c7775cea9",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.path }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2592,
+        -368
+      ],
+      "id": "93f43755-f41b-47e7-a605-e7276d175809",
+      "name": "Read/Write Files from Disk3"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $json.chatId }}",
+        "binaryData": true,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3392,
+        -368
+      ],
+      "id": "5194893b-5df6-4056-bc32-53d60070b203",
+      "name": "Send a photo message",
+      "webhookId": "03b464df-4fae-426d-b760-c64e00a69231",
+      "credentials": {
+        "telegramApi": {
+          "id": "Pxfn2O4IiJRxOEdf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst staticData = $getWorkflowStaticData('global');\nconst safeName = $json.name.replace(/[<>:\"/\\\\|?*]/g, '').trim();\nconst targetFolder = `${staticData.folderPath}\\\\cat${$json.category}_${safeName}`;\n\nfs.mkdirSync(targetFolder, { recursive: true });\n\nreturn [{\n  json: { ...$json, safeFolderPath: targetFolder },\n  binary: $binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2784,
+        -48
+      ],
+      "id": "6fce11ef-41a5-483d-b5a9-1ec85510c8d5",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst safeName = $json.name.replace(/[<>:\"/\\\\|?*]/g, '').trim();\nconst folderPath = `${$json.folderPath}\\\\cat${$json.category}_${safeName}`;\nfs.mkdirSync(folderPath, { recursive: true });\n\nreturn [{ json: { ...$json, safeFolderPath: folderPath } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2784,
+        144
+      ],
+      "id": "5ec3247b-7645-4ab0-a6cd-af8e4c2d87d2",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst safeName = $json.name.replace(/[<>:\"/\\\\|?*]/g, '').trim();\nconst folderPath = `${$json.folderPath}\\\\cat${$json.category}_${safeName}`;\nfs.mkdirSync(folderPath, { recursive: true });\n\nreturn [{ json: { ...$json, safeFolderPath: folderPath } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2784,
+        336
+      ],
+      "id": "01cf4e9f-656e-4f57-b10f-2c3d9f318e97",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst lockPath = 'D:\\\\n8n-card-pipeline\\\\pipeline.lock';\n\nif (fs.existsSync(lockPath)) {\n  fs.unlinkSync(lockPath);\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        -544
+      ],
+      "id": "81e54466-a715-4215-be67-79bc24e778f0",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst binaryData = $input.item.binary;\n\nreturn {\n  json: { chatId: staticData.chatId },\n  binary: binaryData\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3184,
+        -368
+      ],
+      "id": "17c7824e-ead0-4dd3-a5ca-a4cd215ade93",
+      "name": "Возвращает ChatID для отображения превью"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer вставьте_ключ"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Тема набора: '{{ $json.theme }}' — это жанр в рамках коллекционной игры с глобальной темой 'Кино'. Вот список из 10 предметов, уже подобранных под этот жанр: {{ $json.themeObjects.join(', ') }}. Не меняй и не выдумывай новые предметы — используй ТОЛЬКО предметы из этого списка, распредели все 10 по 4 категориям. Категория 1 (ровно 3 предмета) — объект без мелких деталей, висит в воздухе, фон одноцветный/градиент или простой узор. Категория 2 (ровно 3 предмета) — объект без мелких деталей, стоит на поверхности, позади вертикальная плоскость, простой фон. Категория 3 (ровно 2 предмета) — объект на реалистичной поверхности, объёмный фон. Категория 4 (ровно 2 предмета) — объект вписан в реалистичное окружение, остаётся центральным. Стиль всех карточек: казуальная мобильная 3D-иконка, яркие насыщенные цвета, мягкий свет, без текста, без рамки, без персонажей. Для каждого из 10 предметов напиши детальный image-промпт на английском языке, учитывающий и сам предмет, и его категорию. Ответь СТРОГО в формате JSON-массива из 10 объектов с полями: name, category (число 1-4), prompt. Никакого текста кроме JSON. Каждый промпт обязательно должен заканчиваться ТОЧНО такой фразой без изменений: \\\", casual mobile game 3D icon, Pixar-style rendering, soft studio lighting, vibrant saturated colors, smooth glossy plastic material, consistent art direction across the set\\\".\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1648,
+        -160
+      ],
+      "id": "d94d6309-aefd-4c2b-95a6-b7918ab66608",
+      "name": "Создание промта у Groq"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $json.choices[0].message.content;\nconst cleaned = rawText.replace(/```json|```/g, '').trim();\nconst cards = JSON.parse(cleaned);\n\nconst chatId = $('Разделение темы и пожелания').first().json.chatId;\nconst theme = $('Разделение темы и пожелания').first().json.theme;\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.cardsList = cards.map(c => ({ name: c.name, category: c.category }));\n\nreturn cards.map(card => ({\n  json: { ...card, chatId, theme }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        -160
+      ],
+      "id": "d6828613-bba9-41bf-b3ad-37e18774743e",
+      "name": "Разбор ответа от Groq"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        0
+      ],
+      "id": "764174ff-254c-437a-95e5-7d070dede965",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst binary = {};\n\nitems.forEach((item, i) => {\n  const key = i === 0 ? 'data' : 'data' + i;\n  binary[key] = item.binary.data;\n});\n\nreturn [{ json: {}, binary: binary }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        -368
+      ],
+      "id": "c7e02aed-7ee3-487c-b245-b8205c6b457a",
+      "name": "Объединение картинок 10 в 1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sharp = require('sharp');\n\nconst keys = ['data','data1','data2','data3','data4','data5','data6','data7','data8','data9'];\nconst tileSize = 1024;\nconst cols = 5;\nconst rows = 2;\n\nconst composites = [];\nfor (let i = 0; i < keys.length; i++) {\n  const buffer = await this.helpers.getBinaryDataBuffer(0, keys[i]);\n  const resized = await sharp(buffer)\n    .resize(tileSize, tileSize, { fit: 'cover' })\n    .toBuffer();\n\n  composites.push({\n    input: resized,\n    left: (i % cols) * tileSize,\n    top: Math.floor(i / cols) * tileSize\n  });\n}\n\nconst canvas = sharp({\n  create: {\n    width: tileSize * cols,\n    height: tileSize * rows,\n    channels: 4,\n    background: { r: 255, g: 255, b: 255, alpha: 1 }\n  }\n}).composite(composites).jpeg({ quality: 85 });\n\nconst outputBuffer = await canvas.toBuffer();\nconst finalBinary = await this.helpers.prepareBinaryData(outputBuffer, 'grid.jpg', 'image/jpeg');\n\nreturn [{ json: {}, binary: { data: finalBinary } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2992,
+        -368
+      ],
+      "id": "19535c11-84fb-4a3b-a63a-6e79022d2124",
+      "name": "Сбор картинок на полотно"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer вставьте_ключ"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Это генератор изображений для коллекционных карточек мобильной игры. Глобальная тема всей коллекции — 'Кино'. Каждый отдельный набор карточек посвящён конкретному жанру или поджанру фильмов. Сейчас нужно подобрать 10 знаковых предметов для поджанра: '{{ $json.theme }}'. Дополнительные пожелания продюсера: '{{ $json.wishes }}'. Предметы должны быть узнаваемыми атрибутами именно этого киножанра — вещами, глядя на которые человек сразу вспомнит фильмы этого жанра, а не случайными нейтральными объектами. Примеры логики: жанр 'Детектив' -> лупа, курительная трубка, печатная машинка, папка с уликами, шляпа-федора. Жанр 'Вестерн' -> ковбойская шляпа, кактус, звезда шерифа, револьвер, двери салуна. Составь такой же список из 10 предметов для введённого жанра, с учётом любых пожеланий продюсера. Ответь СТРОГО в формате JSON-массива из 10 строк с названиями предметов на английском языке, без пояснений и без markdown.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1168,
+        -160
+      ],
+      "id": "0cdab01d-d104-45d5-823d-d2b4d7e1ccb3",
+      "name": "Анализ жанра"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $json.choices[0].message.content;\nconst cleaned = rawText.replace(/```json|```/g, '').trim();\nconst objects = JSON.parse(cleaned);\n\nconst staticData = $getWorkflowStaticData('global');\n\nreturn [{\n  json: {\n    chatId: staticData.chatId,\n    theme: staticData.theme,\n    wishes: staticData.wishes,\n    themeObjects: objects\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        -160
+      ],
+      "id": "89dad31a-0456-41f2-8972-85d53c3c615d",
+      "name": "Разбор списка предметов"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=🔍 Анализирую тему набора «{{ $json.theme }}»...",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        -352
+      ],
+      "id": "df51fef0-1e8d-4dcd-9a8b-9673c283bdd4",
+      "name": "Сигнал пользователю о принятии темы",
+      "webhookId": "3bf3b4e7-129a-4f1f-b251-c23eb6e2101c",
+      "credentials": {
+        "telegramApi": {
+          "id": "Pxfn2O4IiJRxOEdf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Разбор списка предметов').item.json.chatId }}",
+        "text": "=🖼 Начинаю генерацию набора «{{ $('Разбор списка предметов').item.json.theme }}».\n\n• Время ожидания:\n  ⏳5-10 мин",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        -352
+      ],
+      "id": "66bf0717-f76d-4593-9369-b41978b38c60",
+      "name": "Сигнал пользователю о начале генерации",
+      "webhookId": "3bf3b4e7-129a-4f1f-b251-c23eb6e2101c",
+      "credentials": {
+        "telegramApi": {
+          "id": "Pxfn2O4IiJRxOEdf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ '🎞 Тема набора: ' + $json.theme + '\\n\\n📦 Предметы:\\n' + $json.themeObjects.map(item => '• ' + item).join('\\n') }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1648,
+        -352
+      ],
+      "id": "3fca8714-9f7f-4969-9e52-c311c1b9283d",
+      "name": "Отправка списка предметов",
+      "webhookId": "3bf3b4e7-129a-4f1f-b251-c23eb6e2101c",
+      "credentials": {
+        "telegramApi": {
+          "id": "Pxfn2O4IiJRxOEdf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2592,
+        -544
+      ],
+      "id": "cd406c08-afe3-4103-851d-561faaa4ee24",
+      "name": "Финальное сообщение о готовности",
+      "webhookId": "862b035b-2a52-4174-87f7-33f30cad3ad1",
+      "credentials": {
+        "telegramApi": {
+          "id": "Pxfn2O4IiJRxOEdf",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const s = $getWorkflowStaticData('global');\n\nconst elapsedMs = Date.now() - s.startTime;\nconst minutes = Math.floor(elapsedMs / 60000);\nconst seconds = Math.floor((elapsedMs % 60000) / 1000);\nconst elapsedText = minutes > 0 ? `${minutes} мин ${seconds} сек` : `${seconds} сек`;\n\nconst cardsListText = s.cardsList\n  .map((c, i) => `${i + 1}. ${c.name} — категория ${c.category}`)\n  .join('\\n');\n\nconst text = `🎬 Коллекция: Кино\\n🎞 Тема набора: ${s.theme}\\n\\n🃏 Карточки:\\n${cardsListText}\\n\\n⏱ Время генерации: ${elapsedText}\\n📂 Путь: ${s.folderPath}`;\n\nreturn [{\n  json: {\n    chatId: s.chatId,\n    text: text\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2384,
+        -544
+      ],
+      "id": "4c5c7be6-40bb-4102-b49d-a9febf28342f",
+      "name": "Собираем инфу для финального сообщения"
+    },
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($json.prompt) }}?width=1024&height=1024&seed={{ $itemIndex }}&nologo=true&model=flux&enhance=false&negative={{ encodeURIComponent('people, letters, blurry, distorted, extra limbs, extra objects, wrong perspective, broken geometry, low quality, watermark, text, letters, cropped, duplicate') }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2592,
+        -48
+      ],
+      "id": "6e71e627-b221-4ba9-8bf9-bbdeb5ecf007",
+      "name": "Генерация в Pollinations",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Разделение темы и пожелания",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разделение темы и пожелания": {
+      "main": [
+        [
+          {
+            "node": "Анализ жанра",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Сигнал пользователю о принятии темы",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Собираем инфу для финального сообщения",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Генерация в Pollinations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk1": {
+      "main": [
+        []
+      ]
+    },
+    "Read/Write Files from Disk2": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk3": {
+      "main": [
+        [
+          {
+            "node": "Объединение картинок 10 в 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Возвращает ChatID для отображения превью": {
+      "main": [
+        [
+          {
+            "node": "Send a photo message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создание промта у Groq": {
+      "main": [
+        [
+          {
+            "node": "Разбор ответа от Groq",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Сигнал пользователю о начале генерации",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разбор ответа от Groq": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Объединение картинок 10 в 1": {
+      "main": [
+        [
+          {
+            "node": "Сбор картинок на полотно",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сбор картинок на полотно": {
+      "main": [
+        [
+          {
+            "node": "Возвращает ChatID для отображения превью",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Анализ жанра": {
+      "main": [
+        [
+          {
+            "node": "Разбор списка предметов",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разбор списка предметов": {
+      "main": [
+        [
+          {
+            "node": "Создание промта у Groq",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Отправка списка предметов",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сигнал пользователю о принятии темы": {
+      "main": [
+        []
+      ]
+    },
+    "Финальное сообщение о готовности": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Собираем инфу для финального сообщения": {
+      "main": [
+        [
+          {
+            "node": "Финальное сообщение о готовности",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Генерация в Pollinations": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "2c9bfd5f-fa9a-4c55-8f53-684187fac92d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d5a08cdf89f27bbf07841ca2d10c0f02da807116c3e44542221bcf8a216609c"
+  },
+  "nodeGroups": [],
+  "id": "Gxl7oOGVmXhZ5k36",
+  "tags": []
+}
