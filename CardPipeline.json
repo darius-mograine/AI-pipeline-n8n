@@ -1,5 +1,5 @@
 {
-  "name": "CardPipeline-v2",
+  "name": "CardPipeline",
   "nodes": [
     {
       "parameters": {
@@ -112,7 +112,7 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        2960,
+        3184,
         -48
       ],
       "id": "e304adde-9c4b-4df2-8060-61461c4d287e",
@@ -161,7 +161,7 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        2960,
+        3184,
         144
       ],
       "id": "b5c16a2f-94bb-4fbc-9618-023d8a186c7e",
@@ -210,7 +210,7 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        2960,
+        3184,
         336
       ],
       "id": "e54d4c7a-276d-43d1-b42e-6caaff1553c9",
@@ -223,7 +223,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3184,
+        3408,
         -48
       ],
       "id": "aa360638-3443-4199-b23c-d8486aab4313",
@@ -281,25 +281,12 @@
     },
     {
       "parameters": {
-        "jsCode": "const fs = require('fs');\n\nconst staticData = $getWorkflowStaticData('global');\nconst safeName = $json.name.replace(/[<>:\"/\\\\|?*]/g, '').trim();\nconst targetFolder = `${staticData.folderPath}\\\\cat${$json.category}_${safeName}`;\n\nfs.mkdirSync(targetFolder, { recursive: true });\n\nreturn [{\n  json: { ...$json, safeFolderPath: targetFolder },\n  binary: $binary\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2784,
-        -48
-      ],
-      "id": "6fce11ef-41a5-483d-b5a9-1ec85510c8d5",
-      "name": "Code in JavaScript3"
-    },
-    {
-      "parameters": {
         "jsCode": "const fs = require('fs');\n\nconst safeName = $json.name.replace(/[<>:\"/\\\\|?*]/g, '').trim();\nconst folderPath = `${$json.folderPath}\\\\cat${$json.category}_${safeName}`;\nfs.mkdirSync(folderPath, { recursive: true });\n\nreturn [{ json: { ...$json, safeFolderPath: folderPath } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2784,
+        2992,
         144
       ],
       "id": "5ec3247b-7645-4ab0-a6cd-af8e4c2d87d2",
@@ -312,7 +299,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2784,
+        2992,
         336
       ],
       "id": "01cf4e9f-656e-4f57-b10f-2c3d9f318e97",
@@ -360,7 +347,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Тема набора: '{{ $json.theme }}' — это жанр в рамках коллекционной игры с глобальной темой 'Кино'. Вот список из 10 предметов, уже подобранных под этот жанр: {{ $json.themeObjects.join(', ') }}. Не меняй и не выдумывай новые предметы — используй ТОЛЬКО предметы из этого списка, распредели все 10 по 4 категориям. Категория 1 (ровно 3 предмета) — объект без мелких деталей, висит в воздухе, фон одноцветный/градиент или простой узор. Категория 2 (ровно 3 предмета) — объект без мелких деталей, стоит на поверхности, позади вертикальная плоскость, простой фон. Категория 3 (ровно 2 предмета) — объект на реалистичной поверхности, объёмный фон. Категория 4 (ровно 2 предмета) — объект вписан в реалистичное окружение, остаётся центральным. Стиль всех карточек: казуальная мобильная 3D-иконка, яркие насыщенные цвета, мягкий свет, без текста, без рамки, без персонажей. Для каждого из 10 предметов напиши детальный image-промпт на английском языке, учитывающий и сам предмет, и его категорию. Ответь СТРОГО в формате JSON-массива из 10 объектов с полями: name, category (число 1-4), prompt. Никакого текста кроме JSON. Каждый промпт обязательно должен заканчиваться ТОЧНО такой фразой без изменений: \\\", casual mobile game 3D icon, Pixar-style rendering, soft studio lighting, vibrant saturated colors, smooth glossy plastic material, consistent art direction across the set\\\".\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"max_tokens\": 3000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Тема набора: '{{ $json.theme }}' — это жанр в рамках коллекции игры с глобальной темой 'Кино'. Вот список из 10 предметов, уже подобранных под этот жанр: {{ $json.themeObjects.map(o => o.en).join(', ') }}. Не меняй и не выдумывай новые предметы — используй ТОЛЬКО предметы из этого списка, распредели все 10 по 4 категориям. Все предложенные и используемые предметы должны быть уместны для детской аудитории и семейной мобильной игры: никогда не рисуй алкоголь, курение, оружие и другие темы, не подходящие для широкой аудитории. ОБЩЕЕ ПРАВИЛО ДЛЯ ВСЕХ КАТЕГОРИЙ: главный предмет всегда строго по центру кадра — точно по горизонтали и вертикали, без смещения в сторону. Предмет должен заполнять не менее 75-80% кадра — это самый крупный и детализированный элемент изображения. ОБЩЕЕ ПРАВИЛО ДЛЯ ГЕОМЕТРИЧЕСКИХ УЗОРОВ (категории 1, 2 и фон категории 3): узор на фоне — строго ПЛОСКАЯ, двумерная графическая текстура без какого-либо объёма: без теней на самом узоре, без имитации объёма или глубины, ровно в двух цветах (дуотон, третий цвет добавлять нельзя). Узор должен восприниматься исключительно как абстрактная плоская текстура фона и НИКОГДА не должен превращаться в отдельный физический объект — не доска, не ширма, не орнамент с рамкой, не стена с видимыми краями и границами. Просто ровный повторяющийся плоский рисунок на весь фон. Категория 1 (3 карточки): объект без мелких деталей, висит в воздухе. Предмет не отбрасывает НИКАКОЙ тени — ни на фон, ни под собой. В кадре нет никаких других предметов, кроме главного. Фон — плоский геометрический узор (прямые полосы одинаковой ширины, ИЛИ сетка одинаковых шестиугольников, ИЛИ ряд одинаковых ромбов), яркий контраст между цветом предмета и фона (жёлтое на голубом, голубое на жёлтом, оранжевое на синем). В центре одного из элементов узора едва заметно размести маленький силуэт-символ по теме предмета. Категория 2 (3 карточки): предмет стоит на поверхности. Поверхность — строго ОДНОТОННАЯ, НЕреалистичная, гладкая заливка одним цветом (не имитация дерева/камня/ткани и любого реального материала). Позади поверхности — вертикальный плоский геометрический узор по тем же правилам, что в категории 1. В кадре нет никаких других предметов, кроме главного. Категория 3 (2 карточки): изображение делится на три чётких слоя — предмет, поверхность и фон. Предмет крупным планом стоит на РЕАЛИСТИЧНОЙ поверхности, соответствующей предмету по смыслу (настоящая текстура дерева, камня, ткани, металла — с реалистичным материалом и текстурой). При этом фон ЗА поверхностью (то, что видно выше линии поверхности) должен быть НЕ реалистичным — строго однотонная заливка ИЛИ плоский геометрический узор, по тем же правилам, что в категориях 1-2. В кадре нет никаких других предметов, кроме главного, ни на поверхности, ни на фоне. Категория 4 (2 карточки): предмет крупным планом и остаётся самым детализированным элементом кадра. Фон — упрощённый, мультяшный, стилизованный пейзаж, подходящий по смыслу предмету (например, для предмета из пустынной тематики — только небо, стилизованные облака и стилизованный песок), но БЕЗ каких-либо дополнительных отдельных объектов, персонажей, животных или людей на фоне — только общая среда/пейзаж, ничего конкретного и отдельно узнаваемого, кроме самого главного предмета. Для каждого из 10 предметов напиши image-промпт на английском языке (без итоговой стилевой фразы — она добавится отдельно), учитывающий сам предмет, категорию, центрирование, размер и все ограничения фона и поверхности. Ответь СТРОГО в формате JSON-массива из 10 объектов с полями: name, category (число 1-4), prompt. Никакого текста кроме JSON.\"\n    }\n  ]\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -370,11 +357,14 @@
         -160
       ],
       "id": "d94d6309-aefd-4c2b-95a6-b7918ab66608",
-      "name": "Создание промта у Groq"
+      "name": "Создание промта у Groq",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
-        "jsCode": "const rawText = $json.choices[0].message.content;\nconst cleaned = rawText.replace(/```json|```/g, '').trim();\nconst cards = JSON.parse(cleaned);\n\nconst chatId = $('Разделение темы и пожелания').first().json.chatId;\nconst theme = $('Разделение темы и пожелания').first().json.theme;\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.cardsList = cards.map(c => ({ name: c.name, category: c.category }));\n\nreturn cards.map(card => ({\n  json: { ...card, chatId, theme }\n}));"
+        "jsCode": "const STYLE_SUFFIX = \", casual mobile game 3D icon, exaggerated soft claymation-style 3D render, plasticine clay aesthetic, matte plastic material with gentle soft sheen (not shiny or reflective), soft diffused studio lighting with subtle rim light, extremely smooth rounded puffy forms with no sharp edges, a few readable characteristic details preserved, harmonious vibrant contrasting color palette, medium level of detail, entire image in sharp focus with no depth of field blur, background rendered with the same quality and sharpness as the main object, consistent art direction across the entire set\";\n\nconst rawText = $json.choices[0].message.content;\nconst cleaned = rawText.replace(/```json|```/g, '').trim();\n\nlet cards;\ntry {\n  cards = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Ответ Groq оборвался или невалиден. Длина ответа: ' + rawText.length + ' символов. Конец ответа: ...' + rawText.slice(-200));\n}\n\ncards = cards.map(c => ({ ...c, prompt: c.prompt + STYLE_SUFFIX }));\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.cardsList = cards.map(c => ({ name: c.name, category: c.category }));\n\nreturn cards.map(card => ({\n  json: { ...card, chatId: staticData.chatId, folderPath: staticData.folderPath }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -446,7 +436,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Это генератор изображений для коллекционных карточек мобильной игры. Глобальная тема всей коллекции — 'Кино'. Каждый отдельный набор карточек посвящён конкретному жанру или поджанру фильмов. Сейчас нужно подобрать 10 знаковых предметов для поджанра: '{{ $json.theme }}'. Дополнительные пожелания продюсера: '{{ $json.wishes }}'. Предметы должны быть узнаваемыми атрибутами именно этого киножанра — вещами, глядя на которые человек сразу вспомнит фильмы этого жанра, а не случайными нейтральными объектами. Примеры логики: жанр 'Детектив' -> лупа, курительная трубка, печатная машинка, папка с уликами, шляпа-федора. Жанр 'Вестерн' -> ковбойская шляпа, кактус, звезда шерифа, револьвер, двери салуна. Составь такой же список из 10 предметов для введённого жанра, с учётом любых пожеланий продюсера. Ответь СТРОГО в формате JSON-массива из 10 строк с названиями предметов на английском языке, без пояснений и без markdown.\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Это генератор изображений для коллекционных карточек мобильной игры. Глобальная тема всей коллекции — 'Кино'. Каждый отдельный набор карточек посвящён конкретному жанру или поджанру фильмов. Сейчас нужно подобрать 10 знаковых предметов для поджанра: '{{ $json.theme }}'. Дополнительные пожелания продюсера: '{{ $json.wishes }}'. Предметы должны быть узнаваемыми атрибутами именно этого киножанра — вещами, глядя на которые человек сразу вспомнит фильмы этого жанра, а не случайными нейтральными объектами. Примеры логики: жанр 'Детектив' -> лупа, курительная трубка, печатная машинка, папка с уликами, шляпа-федора. Жанр 'Вестерн' -> ковбойская шляпа, кактус, звезда шерифа, револьвер, двери салуна. Все предложенные предметы должны быть уместны для детской аудитории и семейной мобильной игры: никакого алкоголя, курения (сигары, трубки, сигареты), оружия, и других тем, не подходящих для широкой аудитории — даже если это стереотипный атрибут жанра. Если жанр наводит на такие ассоциации (например, 'Детектив'), выбирай нейтральные альтернативы: лупа, шляпа-федора, печатная машинка, папка с уликами, отпечаток пальца, компас, фонарик, блокнот — вместо алкоголя/курения. Составь такой же список из 10 предметов для введённого жанра, с учётом любых пожеланий продюсера. Ответь СТРОГО в формате JSON-массива из 10 объектов с двумя полями: en (название предмета на английском языке, для использования в image-промптах), ru (перевод названия на русский язык, для показа пользователю). Никакого текста и markdown кроме самого JSON.\"\n    }\n  ]\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -522,7 +512,7 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "={{ '🎞 Тема набора: ' + $json.theme + '\\n\\n📦 Предметы:\\n' + $json.themeObjects.map(item => '• ' + item).join('\\n') }}",
+        "text": "={{ '🎞 Тема набора: ' + $json.theme + '\\n\\n📦 Предметы:\\n\\n' + $json.themeObjects.map(item => '• ' + item.ru).join('\\n') }}",
         "additionalFields": {
           "appendAttribution": false
         }
@@ -582,14 +572,47 @@
     },
     {
       "parameters": {
-        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($json.prompt) }}?width=1024&height=1024&seed={{ $itemIndex }}&nologo=true&model=flux&enhance=false&negative={{ encodeURIComponent('people, letters, blurry, distorted, extra limbs, extra objects, wrong perspective, broken geometry, low quality, watermark, text, letters, cropped, duplicate') }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
+        "jsCode": "const fs = require('fs');\n\nconst staticData = $getWorkflowStaticData('global');\nconst safeName = $json.name.replace(/[<>:\"/\\\\|?*]/g, '').trim();\nconst targetFolder = `${staticData.folderPath}\\\\cat${$json.category}_${safeName}`;\n\nfs.mkdirSync(targetFolder, { recursive: true });\n\nreturn [{\n  json: { ...$json, safeFolderPath: targetFolder },\n  binary: $binary\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2992,
+        -48
+      ],
+      "id": "6fce11ef-41a5-483d-b5a9-1ec85510c8d5",
+      "name": "Создание папки через fs-модуль"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json.result || $json;\nconst base64Image = response.image;\n\nif (!base64Image) {\n  throw new Error('Не нашёл картинку в ответе Cloudflare. Реальный ответ: ' + JSON.stringify($json).slice(0, 300));\n}\n\nconst buffer = Buffer.from(base64Image, 'base64');\nconst binaryData = await this.helpers.prepareBinaryData(buffer, 'variant.png', 'image/png');\n\nreturn [{\n  json: { ...$('Wait').item.json },\n  binary: { data: binaryData }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        -48
+      ],
+      "id": "5c2bd2ad-b5b5-41af-aff5-a934be836984",
+      "name": "Декодирование base64"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cloudflare.com/client/v4/accounts/c1a3cac7dcc34c7cc8a5e0cfe49c0dda/ai/run/@cf/black-forest-labs/flux-1-schnell",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer вставьте_ключ"
             }
-          }
-        }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prompt\": \"{{ $json.prompt }}\"\n}",
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
@@ -598,9 +621,37 @@
         -48
       ],
       "id": "6e71e627-b221-4ba9-8bf9-bbdeb5ecf007",
-      "name": "Генерация в Pollinations",
+      "name": "Генерация в Cloudflare Workers AI",
       "retryOnFail": true,
-      "waitBetweenTries": 5000
+      "waitBetweenTries": 5000,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer вставьте_ключ"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Тема набора: '{{ $json.theme }}' — это жанр в рамках коллекционной игры с глобальной темой 'Кино'. Вот список из 10 предметов, уже подобранных под этот жанр: {{ $json.themeObjects.join(', ') }}. Не меняй и не выдумывай новые предметы — используй ТОЛЬКО предметы из этого списка, распредели все 10 по 4 категориям. Категория 1 (ровно 3 предмета) — объект без мелких деталей, висит в воздухе, фон одноцветный/градиент или простой узор. Категория 2 (ровно 3 предмета) — объект без мелких деталей, стоит на поверхности, позади вертикальная плоскость, простой фон. Категория 3 (ровно 2 предмета) — объект на реалистичной поверхности, объёмный фон. Категория 4 (ровно 2 предмета) — объект вписан в реалистичное окружение, остаётся центральным. Стиль всех карточек: казуальная мобильная 3D-иконка, яркие насыщенные цвета, мягкий свет, без текста, без рамки, без персонажей. Для каждого из 10 предметов напиши детальный image-промпт на английском языке, учитывающий и сам предмет, и его категорию. Ответь СТРОГО в формате JSON-массива из 10 объектов с полями: name, category (число 1-4), prompt. Никакого текста кроме JSON. Каждый промпт обязательно должен заканчиваться ТОЧНО такой фразой без изменений: \\\", casual mobile game 3D icon, Pixar-style rendering, soft studio lighting, vibrant saturated colors, smooth glossy plastic material, consistent art direction across the set\\\".\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1648,
+        64
+      ],
+      "id": "2564f068-ecc1-4534-af3f-ec5e20780ec2",
+      "name": "Создание промта у Groq1"
     }
   ],
   "pinData": {},
@@ -681,7 +732,7 @@
       "main": [
         [
           {
-            "node": "Генерация в Pollinations",
+            "node": "Генерация в Cloudflare Workers AI",
             "type": "main",
             "index": 0
           }
@@ -780,17 +831,6 @@
         [
           {
             "node": "Объединение картинок 10 в 1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript3": {
-      "main": [
-        [
-          {
-            "node": "Read/Write Files from Disk",
             "type": "main",
             "index": 0
           }
@@ -944,11 +984,33 @@
         ]
       ]
     },
-    "Генерация в Pollinations": {
+    "Создание папки через fs-модуль": {
       "main": [
         [
           {
-            "node": "Code in JavaScript3",
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Генерация в Cloudflare Workers AI": {
+      "main": [
+        [
+          {
+            "node": "Декодирование base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Декодирование base64": {
+      "main": [
+        [
+          {
+            "node": "Создание папки через fs-модуль",
             "type": "main",
             "index": 0
           }
@@ -962,7 +1024,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "2c9bfd5f-fa9a-4c55-8f53-684187fac92d",
+  "versionId": "e0fbc8f1-3014-483e-94f3-1a0abeebc999",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "8d5a08cdf89f27bbf07841ca2d10c0f02da807116c3e44542221bcf8a216609c"
