@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Blocks commits that contain API keys / tokens (Bearer tokens, provider key
+# prefixes, Telegram bot tokens, etc.) in staged changes.
+#
+# Enable once per clone with:
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+pattern='gsk_[A-Za-z0-9]{20,}|cfut_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}|Bearer [A-Za-z0-9._-]{20,}'
+
+hits=$(git diff --cached -U0 -- . ':(exclude).githooks/*' | grep -E '^\+' | grep -Ev '^\+\+\+' | grep -EnH "$pattern" || true)
+
+if [ -n "$hits" ]; then
+  echo "pre-commit: possible API key / secret detected in staged changes:" >&2
+  echo "$hits" >&2
+  echo >&2
+  echo "Remove the secret (use a placeholder like 'вставьте_ключ') before committing." >&2
+  echo "If this is a false positive, commit with 'git commit --no-verify'." >&2
+  exit 1
+fi
